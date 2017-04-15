@@ -28,7 +28,7 @@ if (sizeof($result) == 2) {
 } else {
 	die(json_encode(array('error' => 'invalid arguments')));
 }
-$verseStart = $chapter1 * 1000 + $verse1;
+$verseStart = $book * 1000000 + $chapter1 * 1000 + $verse1;
 
 if ($verseEnd == null) {
 	$chapter2 = $chapter1;
@@ -45,43 +45,45 @@ if ($verseEnd == null) {
 	    die(json_encode(array('error' => 'invalid arguments')));
 	}
 }
-$verseEnd = $chapter2 * 1000 + $verse2;
+$verseEnd = $book * 1000000 + $chapter2 * 1000 + $verse2;
 
-$sql = sprintf("SELECT Chapter, Verse, Lection FROM BibleText WHERE Book='%d' AND Chapter*1000+Verse>='%d' AND Chapter*1000+Verse<='%d'", $book, $verseStart, $verseEnd);
+$sql = sprintf("SELECT Id, Lection FROM Verse WHERE Id>='%d' AND Id<='%d'",
+	mysql_real_escape_string($book),
+	mysql_real_escape_string($verseStart),
+	mysql_real_escape_string($verseEnd));
 $result = mysql_query($sql) or die('Query failed: ' . mysql_error());
 
 $chapters = [];
-$chapterCount = 0;
+$chapterId = 0;
 $chapter = 0;
 $verses = [];
-$book = [];
+$paragraphs = [];
 
 while ($row = mysql_fetch_array($result, MYSQL_ASSOC)) {
 	if ($chapter != $row["Chapter"]) {
 		if (sizeof($verses) > 0) {
-			$chapters["id"] = $chapterCount++;
+			$chapters["id"] = $chapterId++;
 			$chapters["title"] = "";
 			$chapters["verses"] = $verses;
-	        array_push($book, $chapters);
+	        array_push($paragraphs, $chapters);
 			$verses = [];
 		}
-
-		$chapter = $row["Chapter"];
+		$chapter = $row["Id"] / 1000 % 1000;
 		$chapters = [];
 	}
-	$verse = [];
-	$verse["verse"] = $chapter.":".$row["Verse"]; 
-	$verse["text"] = $row["lection"];
+	$verseId = $row["Id"] % 1000;
+	$verse["verse"] = $chapter.":".$verseId; 
+	$verse["text"] = $row["Lection"];
 	array_push($verses, $verse);
 }
 mysql_free_result($result);
 
 if (sizeof($verses) > 0) {
-	$chapters["id"] = $chapterCount++;
+	$chapters["id"] = $chapterId;
 	$chapters["title"] = "";
     $chapters["verses"] = $verses;
-    array_push($book, $chapters);
+    array_push($paragraphs, $chapters);
 }
 
-echo json_encode(array('paragraphs' => $book), JSON_UNESCAPED_UNICODE);
+echo json_encode(array('paragraphs' => $paragraphs), JSON_UNESCAPED_UNICODE);
 ?>
